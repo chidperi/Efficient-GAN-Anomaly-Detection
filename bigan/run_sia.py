@@ -12,6 +12,8 @@ from utils.evaluations import do_prc_roc
 RANDOM_SEED = 13
 FREQ_PRINT = 20  # print frequency image tensorboard [20]
 
+results_dir = '/home/chidperi/Projects/Aircraft/'
+
 
 def get_getter(ema):  # to update neural net with moving avg variables, suitable for ss learning cf Saliman
     def ema_getter(getter, name, *args, **kwargs):
@@ -340,7 +342,7 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed):
         fpr, tpr, _ = roc_curve(testy, scores)
         auc_score = auc(fpr, tpr)
 
-        do_prc_roc(scores, testy, file_name='%.4f_prc' % weight, directory='/home/chidperi/Projects/Aircraft/', plot=True)
+        do_prc_roc(scores, testy, file_name='%.4f' % weight, directory=results_dir, plot=True)
         print(
                 "Testing : Prec = %.4f | Rec = %.4f | F1 = %.4f | AUC = %.4f "
                 % (precision, recall, f1, auc_score))

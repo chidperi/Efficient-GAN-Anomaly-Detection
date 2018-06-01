@@ -38,7 +38,7 @@ def _get_dataset():
                 (?,)
     """
     label = 0
-    x_train_orig, y_train_orig, x_test, y_test = cross_validation_on_DA_features([1, 2, 3, 4], [5])
+    x_train_orig, y_train_orig, x_test, y_test = cross_validation_on_DA_features([1, 2, 3, 5], [4])
     idx = np.where(y_train_orig == label)  # please note label is the label of normal samples
     x_train, y_train  = x_train_orig[idx], y_train_orig[idx]
 

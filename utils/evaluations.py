@@ -2,7 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc, average_precision_score, precision_recall_curve, auc
-
+import pandas as pd
 
 def do_prc_roc(scores, true_labels, file_name='', directory='', plot=True):
     """ Does the PRC curve
@@ -19,7 +19,7 @@ def do_prc_roc(scores, true_labels, file_name='', directory='', plot=True):
     precision, recall, thresholds = precision_recall_curve(true_labels, scores)
     prc_auc = auc(recall, precision)
 
-    fpr, tpr, _ = roc_curve(true_labels, scores)
+    fpr, tpr, roc_threshold = roc_curve(true_labels, scores)
     auc_score = auc(fpr, tpr)
 
     if plot:
@@ -48,6 +48,15 @@ def do_prc_roc(scores, true_labels, file_name='', directory='', plot=True):
         plt.savefig(directory+'/' + file_name + '_roc_prc.pdf')
         plt.close()
 
+    roc_data = pd.DataFrame({'fpr':fpr, 'tpr':tpr, 'threshold':roc_threshold})
+    roc_data.to_csv(directory+'/' + file_name + '_roc.csv')
+
+    thresholds = np.append(thresholds, np.inf)
+    print(precision.shape, recall.shape, thresholds.shape)
+
+    prc_data = pd.DataFrame({'precision':precision, 'recall':recall, 'threshold':thresholds})
+
+    prc_data.to_csv(directory + '/' + file_name + '_prc.csv')
     return prc_auc
 
 
