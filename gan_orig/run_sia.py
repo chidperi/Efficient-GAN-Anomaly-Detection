@@ -40,7 +40,7 @@ def display_progression_epoch(j, id_max):
 
 def create_logdir(method, weight, rd):
     """ Directory to save training logs, weights, biases, etc."""
-    return "gan/train_logs/kdd/{}/{}/{}".format(weight, method, rd)
+    return "gan_orig/train_logs/kdd/{}/{}/{}".format(weight, method, rd)
 
 
 def train_and_test(nb_epochs, weight, method, degree, random_seed):
@@ -271,7 +271,7 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed):
             ran_to = (t + 1) * batch_size
             begin_val_batch = time.time()
 
-            # invert the gan
+            # invert the gan_orig
             feed_dict = {input_pl: testx[ran_from:ran_to],
                          is_training_pl:False}
 
@@ -286,7 +286,7 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed):
         ran_from = nr_batches_test * batch_size
         ran_to = (nr_batches_test + 1) * batch_size
         size = testx[ran_from:ran_to].shape[0]
-        fill = np.ones([batch_size - size, 121])
+        fill = np.ones([batch_size - size, 70])
 
         batch = np.concatenate([testx[ran_from:ran_to], fill], axis=0)
         feed_dict = {input_pl: batch,

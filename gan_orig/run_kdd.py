@@ -4,9 +4,8 @@ import tensorflow as tf
 import logging
 import importlib
 import sys
-import gan.mnist_utilities as network
-import data.mnist as data
-from utils.evaluations import do_prc, do_roc
+import gan.kdd_utilities as network
+import data.kdd as data
 from sklearn.metrics import precision_recall_fscore_support
 
 
@@ -22,8 +21,7 @@ def get_getter(ema):  # to update neural net with moving avg variables, suitable
 
     return ema_getter
 
-def display_parameters(batch_size, starting_lr, ema_decay,
-                       weight, method, degree, label):
+def display_parameters(batch_size, starting_lr, ema_decay, weight, method, degree):
     '''See parameters
     '''
     print('Batch size: ', batch_size)
@@ -32,7 +30,6 @@ def display_parameters(batch_size, starting_lr, ema_decay,
     print('Weight: ', weight)
     print('Method for discriminator: ', method)
     print('Degree for L norms: ', degree)
-    print('Anomalous label: ', label)
 
 def display_progression_epoch(j, id_max):
     '''See epoch progression
@@ -41,12 +38,12 @@ def display_progression_epoch(j, id_max):
     sys.stdout.write(str(batch_progression) + ' % epoch' + chr(13))
     _ = sys.stdout.flush
 
-def create_logdir(method, weight, label, rd):
+def create_logdir(method, weight, rd):
     """ Directory to save training logs, weights, biases, etc."""
-    return "bigan/train_logs/mnist/{}/{}/{}/{}".format(weight, method, label, rd)
+    return "gan_orig/train_logs/kdd/{}/{}/{}".format(weight, method, rd)
 
 
-def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
+def train_and_test(nb_epochs, weight, method, degree, random_seed):
     """ Runs the Bigan on the KDD dataset
 
     Note:
@@ -60,7 +57,7 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
         anomalous_label (int): int in range 0 to 10, is the class/digit
                                 which is considered outlier
     """
-    logger = logging.getLogger("GAN.train.mnist.{}.{}".format(method,label))
+    logger = logging.getLogger("GAN.train.kdd.{}".format(method))
 
     # Placeholders
     input_pl = tf.placeholder(tf.float32, shape=data.get_shape_input(), name="input")
@@ -68,15 +65,15 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
     learning_rate = tf.placeholder(tf.float32, shape=(), name="lr_pl")
 
     # Data
-    trainx, trainy = data.get_train(label, True)
+    trainx, trainy = data.get_train()
     trainx_copy = trainx.copy()
-    testx, testy = data.get_test(label, True)
+    testx, testy = data.get_test()
 
     # Parameters
     starting_lr = network.learning_rate
     batch_size = network.batch_size
     latent_dim = network.latent_dim
-    ema_decay = 0.999
+    ema_decay = 0.9999
 
     rng = np.random.RandomState(RANDOM_SEED)
     nr_batches_train = int(trainx.shape[0] / batch_size)
@@ -85,7 +82,7 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
     logger.info('Building training graph...')
 
     logger.warn("The GAN is training with the following parameters:")
-    display_parameters(batch_size, starting_lr, ema_decay, weight, method, degree, label)
+    display_parameters(batch_size, starting_lr, ema_decay, weight, method, degree)
 
     gen = network.generator
     dis = network.discriminator
@@ -144,14 +141,9 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
         with tf.name_scope('gen_summary'):
             tf.summary.scalar('loss_generator', generator_loss, ['gen'])
 
-        with tf.name_scope('image_summary'):
-            tf.summary.image('reconstruct', generator, 8, ['image'])
-            tf.summary.image('input_images', input_pl, 8, ['image'])
-
 
         sum_op_dis = tf.summary.merge_all('dis')
         sum_op_gen = tf.summary.merge_all('gen')
-        sum_op_im = tf.summary.merge_all('image')
 
     logger.info('Building testing graph...')
 
@@ -187,7 +179,7 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
 
     with tf.variable_scope("Test_learning_rate"):
         step = tf.Variable(0, trainable=False)
-        boundaries = [200, 300]
+        boundaries = [300, 400]
         values = [0.01, 0.001, 0.0005]
         learning_rate_invert = tf.train.piecewise_constant(step, boundaries, values)
         reinit_lr = tf.variables_initializer(
@@ -205,7 +197,7 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
     with tf.name_scope("Scores"):
         list_scores = loss
 
-    logdir = create_logdir(method, weight, label, random_seed)
+    logdir = create_logdir(method, weight, random_seed)
 
     sv = tf.train.Supervisor(logdir=logdir, save_summaries_secs=None,
                              save_model_secs=120)
@@ -253,13 +245,6 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
                 train_loss_gen += lg
                 writer.add_summary(sm, train_batch)
 
-                if t % FREQ_PRINT == 0:  # inspect reconstruction
-                    t= np.random.randint(0,4000)
-                    ran_from = t
-                    ran_to = t + batch_size
-                    sm = sess.run(sum_op_im, feed_dict={input_pl: trainx[ran_from:ran_to],is_training_pl: False})
-                    writer.add_summary(sm, train_batch)
-
                 train_batch += 1
 
             train_loss_gen /= nr_batches_train
@@ -278,14 +263,15 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
         scores = []
         inference_time = []
 
-        # testing
+        # Testing
         for t in range(nr_batches_test):
+
             # construct randomly permuted minibatches
             ran_from = t * batch_size
             ran_to = (t + 1) * batch_size
             begin_val_batch = time.time()
 
-            # invert the gan
+            # invert the gan_orig
             feed_dict = {input_pl: testx[ran_from:ran_to],
                          is_training_pl:False}
 
@@ -300,7 +286,7 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
         ran_from = nr_batches_test * batch_size
         ran_to = (nr_batches_test + 1) * batch_size
         size = testx[ran_from:ran_to].shape[0]
-        fill = np.ones([batch_size - size, 28, 28, 1])
+        fill = np.ones([batch_size - size, 121])
 
         batch = np.concatenate([testx[ran_from:ran_to], fill], axis=0)
         feed_dict = {input_pl: batch,
@@ -313,17 +299,27 @@ def train_and_test(nb_epochs, weight, method, degree, random_seed, label):
 
         scores += batch_score[:size]
 
-        prc_auc = do_prc(scores, testy,
-               file_name=r'gan/mnist/{}/{}/{}'.format(method, weight,
-                                                     label),
-               directory=r'results/gan/mnist/{}/{}/'.format(method,
-                                                           weight))
+        per = np.percentile(scores, 80)
 
-        print("Testing | PRC AUC = {:.4f}".format(prc_auc))
+        y_pred = scores.copy()
+        y_pred = np.array(y_pred)
+
+        inds = (y_pred < per)
+        inds_comp = (y_pred >= per)
+
+        y_pred[inds] = 0
+        y_pred[inds_comp] = 1
+
+        precision, recall, f1,_ = precision_recall_fscore_support(testy,
+                                                                  y_pred,
+                                                                  average='binary')
+        print(
+            "Testing : Prec = %.4f | Rec = %.4f | F1 = %.4f "
+            % (precision, recall, f1))
 
 def run(nb_epochs, weight, method, degree, label, random_seed=42):
     """ Runs the training process"""
     with tf.Graph().as_default():
         # Set the graph level seed
         tf.set_random_seed(random_seed)
-        train_and_test(nb_epochs, weight, method, degree, random_seed, label)
+        train_and_test(nb_epochs, weight, method, degree, random_seed)
